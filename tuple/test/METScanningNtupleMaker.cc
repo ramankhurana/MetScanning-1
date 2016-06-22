@@ -34,6 +34,11 @@ METScanningNtupleMaker::METScanningNtupleMaker(const edm::ParameterSet& iConfig)
   RecHitsEE_token = consumes<EcalRecHitCollection>(iConfig.getParameter<edm::InputTag>("EERecHits"));
   RecHitsES_token = consumes<EcalRecHitCollection>(iConfig.getParameter<edm::InputTag>("ESRecHits"));
   hSummary_token = consumes<HcalNoiseSummary>(iConfig.getParameter<edm::InputTag>("HcalNoise"));
+  BadChCandF_token = consumes<bool>(iConfig.getParameter<edm::InputTag>("BadChCandFilter"));
+  BadPFMuon_token = consumes<bool>(iConfig.getParameter<edm::InputTag>("BadPFMuon"));
+  vertex_token = consumes<vector<reco::Vertex> >(iConfig.getParameter<edm::InputTag>("OfflinePrimaryVertices"));
+
+
   
 
   // The root tuple
@@ -50,6 +55,7 @@ METScanningNtupleMaker::METScanningNtupleMaker(const edm::ParameterSet& iConfig)
   s->Branch("event",&event,"event/l");  
   s->Branch("time",&time,"time/l");
   
+  s->Branch("nVtx", &nVtx, "nVtx/l");
   s->Branch("filter_csc2015",&filtercsc2015,"filter_csc2015/O");
   s->Branch("filter_globaltighthalo2016",&filterglobaltighthalo2016,"filter_globaltighthalo2016/O");
   s->Branch("filter_globalsupertighthalo2016",&filterglobalsupertighthalo2016,"filter_globalsupertighthalo2016/O");
@@ -60,6 +66,9 @@ METScanningNtupleMaker::METScanningNtupleMaker(const edm::ParameterSet& iConfig)
   s->Branch("filter_hbheiso",&filterhbheiso,"filter_hbheiso/O");
   s->Branch("filter_ecaltp",&filterecaltp,"filter_ecaltp/O");
   s->Branch("filter_ecalsc",&filterecalsc,"filter_ecalsc/O");
+  s->Branch("filter_badChCand",&filterbadChCandidate,"filter_badChCand/O");
+  s->Branch("filter_badPFMuon",&filterbadPFMuon,"filter_badPFMuon/O");
+  
 
   //Leptons =====================================
   s->Branch("pfLepton_pt"             , &pfLepton_pt   );  
@@ -166,7 +175,11 @@ METScanningNtupleMaker::analyze(const Event& iEvent,
   lumiBlock = (size_t)ilumiBlock;
   time = (size_t)((iEvent.time().value())>>32);
 
-  
+  Handle<vector<reco::Vertex> > offlineVtx;
+  iEvent.getByToken(vertex_token, offlineVtx);
+  nVtx = (size_t) offlineVtx->size();
+  std::cout<<" nVtx = "<<offlineVtx->size()
+	   <<" " <<nVtx<<std::endl;
   //get filters
   /*
   Handle<bool> ifiltertrackingletmc;
@@ -237,8 +250,17 @@ METScanningNtupleMaker::analyze(const Event& iEvent,
   if( hSummary->maxHPDHits()               >= 17                           ) filterhbher1nozeros = false;
   if( hSummary->maxHPDNoOtherHits()        >= 10                           ) filterhbher1nozeros = false;
   if( hSummary->HasBadRBXTS4TS5() && !hSummary->goodJetFoundInLowBVRegion()) filterhbher1nozeros = false;
+
+  Handle<bool> ifilterbadChCand;
+  iEvent.getByToken(BadChCandF_token, ifilterbadChCand);
+  filterbadChCandidate = *ifilterbadChCand;
   
+
+  Handle<bool> ifilterbadPFMuon;
+  iEvent.getByToken(BadPFMuon_token, ifilterbadPFMuon);
+  filterbadPFMuon = *ifilterbadPFMuon;
   
+
   // get Leptons
   Handle<reco::PFCandidateCollection> pfCandidates;
   iEvent.getByToken(PfCandidates_token,pfCandidates);
@@ -268,13 +290,10 @@ METScanningNtupleMaker::analyze(const Event& iEvent,
   iEvent.getByToken(CaloMET_token, caloMET);
 
   Handle<reco::PFMETCollection> pfCaloMET;
-  try {
-      iEvent.getByToken(PFCaloMET_token, pfCaloMET);
-  } catch (...) {}
+  iEvent.getByToken(PFCaloMET_token, pfCaloMET);
+
   Handle<reco::PFClusterMETCollection> pfClusterMET;
-  try{
-      iEvent.getByToken(PFClusterMET_token, pfClusterMET);
-  } catch (...) {}
+  iEvent.getByToken(PFClusterMET_token, pfClusterMET);
 
   Handle<reco::PFMETCollection> pfMET;
   iEvent.getByToken(PFMET_token, pfMET);
@@ -421,17 +440,15 @@ METScanningNtupleMaker::analyze(const Event& iEvent,
   caloMETPt = caloMET->begin()->pt();
   caloMETPhi = caloMET->begin()->phi();
   caloMETSumEt = caloMET->begin()->sumEt();
- 
-  if (pfCaloMET.isValid()) { 
-      pfCaloMETPt = pfCaloMET->begin()->pt();
-      pfCaloMETPhi = pfCaloMET->begin()->phi();
-      pfCaloMETSumEt = pfCaloMET->begin()->sumEt();
-  }
-  if (pfClusterMET.isValid()) {
-      pfClusterMETPt = pfClusterMET->begin()->pt();
-      pfClusterMETPhi = pfClusterMET->begin()->phi();
-      pfClusterMETSumEt = pfClusterMET->begin()->sumEt();
-  }
+  
+  pfCaloMETPt = pfCaloMET->begin()->pt();
+  pfCaloMETPhi = pfCaloMET->begin()->phi();
+  pfCaloMETSumEt = pfCaloMET->begin()->sumEt();
+  
+  pfClusterMETPt = pfClusterMET->begin()->pt();
+  pfClusterMETPhi = pfClusterMET->begin()->phi();
+  pfClusterMETSumEt = pfClusterMET->begin()->sumEt();
+
   pfMETPt = pfMET->begin()->pt();
   pfMETPhi = pfMET->begin()->phi();
   pfMETSumEt = pfMET->begin()->sumEt();
