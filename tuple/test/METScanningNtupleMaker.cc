@@ -38,6 +38,7 @@ METScanningNtupleMaker::METScanningNtupleMaker(const edm::ParameterSet& iConfig)
   BadPFMuon_token = consumes<bool>(iConfig.getParameter<edm::InputTag>("BadPFMuon"));
   vertex_token = consumes<vector<reco::Vertex> >(iConfig.getParameter<edm::InputTag>("OfflinePrimaryVertices"));
 
+  
 
   
 
